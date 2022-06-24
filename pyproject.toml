@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fedexapi_chnoma"
+version = "0.0.1"
+description = "A module I devloped to abstract the Fedex API for use in my programs."
+authors = [
+  { name="Adrian J. Arnett", email="adrianarnett0@gmail.com" },
+]
+readme = "readme.md"
+keywords = ["FedEx", "API"]
+requires-python = ">=3.7"
+dependencies = ["requests"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/chnoma/fedex-api"
+"Bug Tracker" = "https://github.com/chnoma/fedex-api/issues"

@@ -7,9 +7,11 @@ Created on Sun Feb 13 17:21:17 2022
 Created for Colossal Contracting, LLC.
 """
 
-import requests
+import configparser
 from datetime import date
 from dataclasses import dataclass
+
+import requests
 
 @dataclass
 class Package():
@@ -20,13 +22,13 @@ class Package():
 
 class FedexAPI():
     """Wrapper class for the Fedex tracking API"""
-    def __init__(self):
+    def __init__(self, apiKey, secretKey):
         """Initialization function - attempts to obtain auth key"""
         self.API_URL = "https://apis.fedex.com/"
         self.AUTH_URL = "oauth/token"
         self.TRACK_URL = "track/v1/trackingnumbers"
-        # self.API_KEY = ""
-        # self.SECRET_KEY = ""
+        self.API_KEY = apiKey
+        self.SECRET_KEY = secretKey
         authrequest = requests.post(self.API_URL + self.AUTH_URL, 
                                    headers = {"Content-type":"application/x-www-form-urlencoded"},
                                    data = {"grant_type":"client_credentials",
@@ -36,14 +38,9 @@ class FedexAPI():
         print("Obtained authentication key: ", self.AUTH_KEY,"\n_________________________________________________________________________________\n\n\n")
 
     def trackbynumber(self, number):
-        payload = {}
-        payload["trackingInfo"] = []
-        payload["includeDetailedScans"] = "False"
-        trackingObject = {}
-        trackingObject["trackingNumberInfo"] = {"trackingNumber":str(number)}
-        payload["trackingInfo"].append(trackingObject)
+        payload = {"trackingInfo": [{"trackingNumberInfo": {"trackingNumber": str(number)}}], "includeDetailedScans": "False"}
         headers = {"Content-type":"application/json", 
-                   "Authorization":"Bearer "+self.AUTH_KEY}
+                   "Authorization":f"Bearer {self.AUTH_KEY}"}
         trackrequest = requests.request("POST", self.API_URL + self.TRACK_URL,
                                      data = str(payload).replace("'", '"'),
                                      headers = headers)
