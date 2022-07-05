@@ -16,6 +16,7 @@ import requests
 @dataclass
 class Package():
     isValid: bool
+    packageType: str
     deliveryDate: str
     shipDate: str
     json: dict
@@ -58,6 +59,8 @@ class FedexAPI():
             ship = ship[:ship.find("T")]
             deliverDate = deliverDate[:deliverDate.find("T")]
             trackresult = Package(True,
+                                  trackrequest["output"]["completeTrackResults"][0]["trackResults"][0][
+                                      "packageDetails"]["physicalPackagingType"],
                                   date.fromisoformat(deliverDate).strftime("%m/%d/%Y"), date.fromisoformat(ship).strftime("%m/%d/%Y"), trackrequest)
         except:
             trackresult = Package(False, "Invalid Tracking Information", "Invalid Tracking Information", "")
