@@ -17,6 +17,7 @@ import requests
 class Package():
     isValid: bool
     packageType: str
+    quantity: int
     deliveryDate: str
     shipDate: str
     json: dict
@@ -61,6 +62,8 @@ class FedexAPI():
             trackresult = Package(True,
                                   trackrequest["output"]["completeTrackResults"][0]["trackResults"][0][
                                       "packageDetails"]["physicalPackagingType"],
+                                  int(trackrequest["output"]["completeTrackResults"][0]["trackResults"][0][
+                                          "packageDetails"]["count"]),
                                   date.fromisoformat(deliverDate).strftime("%m/%d/%Y"), date.fromisoformat(ship).strftime("%m/%d/%Y"), trackrequest)
         except:
             trackresult = Package(False, "Invalid Tracking Information", "Invalid Tracking Information", "")
