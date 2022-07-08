@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fedexapi_chnoma"
-version = "0.0.21"
+version = "1.0.0"
 description = "A module I devloped to abstract the Fedex API for use in my programs."
 authors = [
   { name="Adrian J. Arnett", email="adrianarnett0@gmail.com" },
