@@ -8,64 +8,195 @@ Created for Colossal Contracting, LLC.
 """
 
 import configparser
-from datetime import date
+from datetime import date, datetime
+from enum import Enum
 from dataclasses import dataclass
 
 import requests
+from requests import HTTPError
+
+API_AUTHORITY = "https://apis.fedex.com/"
+AUTH_PATH = "oauth/token"
+TRACK_PATH = "track/v1/trackingnumbers"
+TIMEOUT = 10
+
+
+class AuthenticationError(Exception):
+    """
+    Generic authentication exception class
+    """
+    pass
+
+
+class InvalidRequestError(Exception):
+    """
+    Generic invalid HTTP request exception class
+    """
+    pass
+
+
+class Event(Enum):
+    ACTUAL_DELIVERY = "ACTUAL_DELIVERY"
+    ACTUAL_PICKUP = "ACTUAL_PICKUP"
+    ACTUAL_TENDER = "ACTUAL_TENDER"
+    ANTICIPATED_TENDER = "ANTICIPATED_TENDER"
+    APPOINTMENT_DELIVERY = "APPOINTMENT_DELIVERY"
+    ATTEMPTED_DELIVERY = "ATTEMPTED_DELIVERY"
+    COMMITMENT = "COMMITMENT"
+    ESTIMATED_ARRIVAL_AT_GATEWAY = "ESTIMATED_ARRIVAL_AT_GATEWAY"
+    ESTIMATED_DELIVERY = "ESTIMATED_DELIVERY"
+    ESTIMATED_PICKUP = "ESTIMATED_PICKUP"
+    ESTIMATED_RETURN_TO_STATION = "ESTIMATED_RETURN_TO_STATION"
+    SHIP = "SHIP"
+    SHIPMENT_DATA_RECEIVED = "SHIPMENT_DATA_RECEIVED"
+
+
+class PackageType(Enum):
+    BAG = "BAG"
+    BARREL = "BARREL"
+    BASKET = "BASKET"
+    BOX = "BOX"
+    BUCKET = "BUCKET"
+    BUNDLE = "BUNDLE"
+    CAGE = "CAGE"
+    CARTON = "CARTON"
+    CASE = "CASE"
+    CHEST = "CHEST"
+    CONTAINER = "CONTAINER"
+    CRATE = "CRATE"
+    CYLINDER = "CYLINDER"
+    DRUM = "DRUM"
+    ENVELOPE = "ENVELOPE"
+    HAMPER = "HAMPER"
+    OTHER = "OTHER"
+    PACKAGE = "PACKAGE"
+    PAIL = "PAIL"
+    PALLET = "PALLET"
+    PARCEL = "PARCEL"
+    PIECE = "PIECE"
+    REEL = "REEL"
+    ROLL = "ROLL"
+    SACK = "SACK"
+    SHRINK_WRAPPED = "SHRINK_WRAPPED"
+    SKID = "SKID"
+    TANK = "TANK"
+    TOTE_BIN = "TOTE_BIN"
+    TUBE = "TUBE"
+    UNIT = "UNIT"
+
 
 @dataclass
-class Package():
-    isValid: bool
-    packageType: str
-    quantity: int
-    deliveryDate: str
-    shipDate: str
-    json: dict
+class DateAndTimeEvent:
+    datetime: datetime
+    type: Event
 
-class FedexAPI():
-    """Wrapper class for the Fedex tracking API"""
-    def __init__(self, apiKey, secretKey):
-        """Initialization function - attempts to obtain auth key"""
-        self.API_URL = "https://apis.fedex.com/"
-        self.AUTH_URL = "oauth/token"
-        self.TRACK_URL = "track/v1/trackingnumbers"
-        self.API_KEY = apiKey
-        self.SECRET_KEY = secretKey
-        authrequest = requests.post(self.API_URL + self.AUTH_URL, 
-                                   headers = {"Content-type":"application/x-www-form-urlencoded"},
-                                   data = {"grant_type":"client_credentials",
-                                           "client_id":self.API_KEY,
-                                             "client_secret":self.SECRET_KEY})
-        self.AUTH_KEY = authrequest.json()['access_token']
-        print("Obtained authentication key: ", self.AUTH_KEY,"\n_________________________________________________________________________________\n\n\n")
 
-    def trackbynumber(self, number):
-        payload = {"trackingInfo": [{"trackingNumberInfo": {"trackingNumber": str(number)}}], "includeDetailedScans": "False"}
-        headers = {"Content-type":"application/json", 
-                   "Authorization":f"Bearer {self.AUTH_KEY}"}
-        trackrequest = requests.request("POST", self.API_URL + self.TRACK_URL,
-                                     data = str(payload).replace("'", '"'),
-                                     headers = headers)
+@dataclass
+class Package:
+    type: PackageType
+    count: int
+
+
+@dataclass
+class TrackingResult:
+    is_valid: bool
+    tracking_number: str
+    unique_id: str
+    carrier_code: str
+    is_delivered: bool
+    is_shipped: bool
+    date_ship: date
+    date_delivery: date  # EST Delivery date if not delivered.
+    latest_status: DateAndTimeEvent
+    events: list
+    package: Package = None
+
+
+class FedexAPI:
+
+    def __init__(self, api_key, secret_key, api_authority=API_AUTHORITY, auth_path=AUTH_PATH, track_path=TRACK_PATH):
+        if secret_key == "" or api_key == "":
+            raise AuthenticationError("\nInvalid key supplied")
+        self.API_URL = api_authority
+        self.AUTH_URL = api_authority + auth_path
+        self.TRACK_URL = api_authority + track_path
+        self.API_KEY = api_key
+        self.SECRET_KEY = secret_key
+        request = requests.post(self.AUTH_URL,
+                                headers={"Content-type": "application/x-www-form-urlencoded"},
+                                data={"grant_type": "client_credentials",
+                                      "client_id": self.API_KEY,
+                                      "client_secret": self.SECRET_KEY})
         try:
-            trackrequest = trackrequest.json()
-            if trackrequest["output"]["completeTrackResults"][0]["trackResults"][0]["latestStatusDetail"]["code"] != "DL":
-                print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nWARNING: Package {number} has not been delivered.\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-            ship = "Unavailable"
-    
-            for entry in trackrequest["output"]["completeTrackResults"][0]["trackResults"][0]["dateAndTimes"]:
-                if entry["type"] == "SHIP":
-                    ship = entry["dateTime"]
-                if entry["type"] == "ACTUAL_DELIVERY":
-                    deliverDate = entry["dateTime"]
-            ship = ship[:ship.find("T")]
-            deliverDate = deliverDate[:deliverDate.find("T")]
-            trackresult = Package(True,
-                                  trackrequest["output"]["completeTrackResults"][0]["trackResults"][0][
-                                      "packageDetails"]["physicalPackagingType"],
-                                  int(trackrequest["output"]["completeTrackResults"][0]["trackResults"][0][
-                                          "packageDetails"]["count"]),
-                                  date.fromisoformat(deliverDate).strftime("%m/%d/%Y"), date.fromisoformat(ship).strftime("%m/%d/%Y"), trackrequest)
-        except:
-            trackresult = Package(False, "Invalid Tracking Information", "Invalid Tracking Information", "")
-            
-        return trackresult
+            self.AUTH_KEY = request.json()['access_token']
+        except IndexError:
+            raise AuthenticationError("\nInvalid authentication request.")
+        print("Obtained authentication key: ", self.AUTH_KEY,
+              "\n_________________________________________________________________________________\n\n\n")
+
+    def track_by_number(self, number: str) -> TrackingResult:
+        payload = {"trackingInfo": [{"trackingNumberInfo": {"trackingNumber": str(number)}}],
+                   "includeDetailedScans": "False"}
+        headers = {"Content-type": "application/json",
+                   "Authorization": f"Bearer {self.AUTH_KEY}"}
+        response = requests.request("POST", self.TRACK_URL,
+                                    data=str(payload).replace("'", '"'),
+                                    headers=headers)
+        response.raise_for_status()
+        response_data = response.json()
+        if "errors" in response_data:
+            raise InvalidRequestError()
+        tracking_results = []
+        for track_index in response_data["output"]["completeTrackResults"]:
+            track_results = track_index["trackResults"]
+            for tracking_result in track_results:
+                tracking_number_info = tracking_result["trackingNumberInfo"]
+                tracking_number = tracking_number_info["trackingNumber"]
+                unique_id = tracking_number_info["trackingNumberUniqueId"]
+                carrier_code = tracking_number_info["carrierCode"]
+                shipped = False
+                delivered = False
+                ship_date = None  # declare out of the loop scope to preserve
+                delivery_date = None  # declare out of the loop scope to preserve
+                latest_date = None  # declare out of the loop scope to preserve
+                latest_type = None  # declare out of the loop scope to preserve
+                events = []
+                for event in tracking_result["dateAndTimes"]:
+                    event_type = Event[event["type"]]
+                    event_date = datetime.fromisoformat(event["dateTime"])
+                    if event_type == Event.SHIP:
+                        shipped = True
+                        ship_date = event_date
+                    elif event_type == Event.ACTUAL_DELIVERY:
+                        delivered = True
+                        delivery_date = event_date
+                    elif event_type == Event.ESTIMATED_DELIVERY:
+                        delivery_date = event_date
+                    if latest_type is None or event_date > latest_date:
+                        latest_date = event_date
+                        latest_type = event_type
+                    new_event = DateAndTimeEvent(event_date, event_type)
+                    events.append(new_event)
+                latest_event = DateAndTimeEvent(latest_date, latest_type)
+                # package = Package(PackageType[tracking_result["packageDetails"]["physicalPackagingType"]],
+                #                   int(tracking_result["packageDetails"]["count"]))
+                new_tracking_result = TrackingResult(
+                    is_valid=True,
+                    tracking_number=tracking_number,
+                    unique_id=unique_id,
+                    carrier_code=carrier_code,
+                    is_delivered=delivered,
+                    is_shipped=shipped,
+                    date_ship=ship_date,
+                    date_delivery=delivery_date,
+                    latest_status=latest_event,
+                    events=events)
+                tracking_results.append(new_tracking_result)
+        # prevent duplicate errors
+        latest_date = None  # declare out of the loop scope to preserve
+        latest_result = None  # declare out of the loop scope to preserve
+        for result in tracking_results:
+            if latest_result is None or result.latest_status.datetime > latest_date:
+                latest_date = result.latest_status.datetime
+                latest_result = result
+        return latest_result
