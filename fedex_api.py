@@ -112,6 +112,15 @@ class TrackingResult:
     package: Package = None
 
 
+def _download_file(url, filename):
+    with requests.get(url, stream=False) as r:
+        r.raise_for_status()
+        with open(filename, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+    return filename
+
+
 class FedexAPI:
 
     def __init__(self, api_key, secret_key, api_authority=API_AUTHORITY, auth_path=AUTH_PATH, track_path=TRACK_PATH):
@@ -200,3 +209,12 @@ class FedexAPI:
                 latest_date = result.latest_status.datetime
                 latest_result = result
         return latest_result
+
+    def download_pod(self, unique_id, new_filename):
+        if len(unique_id.split('~')) == 1:
+            unique_id = self.track_by_number(unique_id).unique_id
+        qualifier = unique_id.split('~')[0]
+        tracking_number = unique_id.split('~')[1]
+        _download_file(
+            f"https://www.fedex.com/trackingCal/retrievePDF.jsp?accountNbr=&anon=true&appType=&destCountry=&locale=en_US&shipDate=&trackingCarrier=FDXA&trackingNumber={tracking_number}&trackingQualifier={qualifier}&type=SPOD",
+            new_filename)
