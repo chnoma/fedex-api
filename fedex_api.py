@@ -7,7 +7,6 @@ Created on Sun Feb 13 17:21:17 2022
 Created for Colossal Contracting, LLC.
 """
 
-import configparser
 from datetime import date, datetime
 from enum import Enum
 from dataclasses import dataclass
@@ -100,15 +99,15 @@ class Package:
 @dataclass
 class TrackingResult:
     is_valid: bool
-    tracking_number: str
-    unique_id: str
-    carrier_code: str
-    is_delivered: bool
-    is_shipped: bool
-    date_ship: date
-    date_delivery: date  # EST Delivery date if not delivered.
-    latest_status: DateAndTimeEvent
-    events: list
+    tracking_number: str = None
+    unique_id: str = None
+    carrier_code: str = None
+    is_delivered: bool = None
+    is_shipped: bool = None
+    date_ship: date = None
+    date_delivery: date = None  # EST Delivery date if not delivered.
+    latest_status: DateAndTimeEvent = None
+    events: list = None
     package: Package = None
 
 
@@ -151,10 +150,13 @@ class FedexAPI:
         response = requests.request("POST", self.TRACK_URL,
                                     data=str(payload).replace("'", '"'),
                                     headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except HTTPError:
+            return TrackingResult(False)
         response_data = response.json()
         if "errors" in response_data:
-            raise InvalidRequestError()
+            return TrackingResult(False)
         tracking_results = []
         for track_index in response_data["output"]["completeTrackResults"]:
             track_results = track_index["trackResults"]
