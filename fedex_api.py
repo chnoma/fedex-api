@@ -172,6 +172,8 @@ class FedexAPI:
                 latest_date = None  # declare out of the loop scope to preserve
                 latest_type = None  # declare out of the loop scope to preserve
                 events = []
+                if "dateAndTimes" not in tracking_result:
+                    return TrackingResult(False)
                 for event in tracking_result["dateAndTimes"]:
                     event_type = Event[event["type"]]
                     event_date = datetime.fromisoformat(event["dateTime"])
