@@ -214,7 +214,10 @@ class FedexAPI:
 
     def download_pod(self, unique_id, new_filename):
         if len(unique_id.split('~')) == 1:
-            unique_id = self.track_by_number(unique_id).unique_id
+            result = self.track_by_number(unique_id)
+            if not result.is_valid:
+                raise InvalidRequestError(f"\nInvalid request for tracking number: {unique_id}")
+            unique_id = result.unique_id
         qualifier = unique_id.split('~')[0]
         tracking_number = unique_id.split('~')[1]
         _download_file(
